@@ -1,3 +1,5 @@
+#ifndef _HELPERFN_H
+#define _HELPERFN_H
 
 #include <iostream>
 #include <vector>
@@ -102,8 +104,6 @@ inline bool doesFileExist(const std::string& name) {
 }
 
 inline bool doesDirExist(const string dirName) {
-    DIR *dir;
-    class dirent *ent;
     class stat st;
 
     if ((stat(dirName.c_str(), &st) != 0) || (! S_ISDIR(st.st_mode))) {
@@ -168,3 +168,4 @@ bool setfacl(string userid, string directory, bool debug) {
     return true;
 }
 
+#endif // _HELPERFN_H
