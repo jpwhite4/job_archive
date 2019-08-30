@@ -1,3 +1,5 @@
+#ifndef _SEMAPHORE_H
+#define _SEMAPHORE_H
 
 #include <mutex>
 #include <condition_variable>
@@ -30,3 +32,4 @@ public:
         count--;
     }
 };
+#endif // _SEMAPHORE_H

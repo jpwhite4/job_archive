@@ -153,7 +153,7 @@ bool verifyUserId(string userid) {
     if ( ! isalpha(userid.c_str()[0]))
         return false;
     if (userid.size() > 1)
-        for (int i=1; i<userid.size(); i++) {
+        for (size_t i=1; i<userid.size(); i++) {
             //if ( ! isalnum(userid.c_str()[i]) && ! isnum(userid.c_str()[i]))
             if ( ! isalnum(userid.c_str()[i]) )
                 return false;
@@ -266,7 +266,7 @@ void do_processFiles( const int& id, const string& targDestPath1, Queue<SlurmJob
         if (debug > 2) cout << "buffer size = " << buffer.size() << endl;
 
         // A3-translate hex code to NL
-        for (int i=0; i<buffer.size(); i++) {
+        for (size_t i=0; i<buffer.size(); i++) {
             // change all 0x00 to newline
             if (buffer[i] == 0x00) buffer[i] = 0x0a;
         }
@@ -401,7 +401,7 @@ void do_inotify(const int& id, const string& watchDir, Queue<SlurmJobDirectory>*
 
     int length, i = 0, wd;
     int fd;
-    char buffer[BUF_LEN];
+    char buffer[BUF_LEN] __attribute__ ((aligned(__alignof__(struct inotify_event))));
 
     /* Initialize Inotify*/
     fd = inotify_init();
@@ -479,7 +479,7 @@ int main( int argc, char **argv ) {
 
     Logger logger;
     char prtBuf[100];
-    sprintf(prtBuf, "main begin - for help: sudo kill -1 %ld", getpid());
+    sprintf(prtBuf, "main begin - for help: sudo kill -1 %ld", static_cast<long>(getpid()));
     logger.LOG(prtBuf);
 
     if (argc == 2 && (strcmp(argv[1],"-d") == 0 || strcmp(argv[1],"-d1") == 0)) {
