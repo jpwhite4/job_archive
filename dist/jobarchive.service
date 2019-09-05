@@ -1,0 +1,13 @@
+[Unit]
+Description=Archive job launch scripts from Slurm
+Documentation=https://github.com/nauhpc/job_archive
+Requires=local-fs.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/jobarchive.conf
+ExecStart=/usr/sbin/job_archive $JOB_ARCHIVE_ARGS
+User=root
+
+[Install]
+WantedBy=multi-user.target
