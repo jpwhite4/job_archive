@@ -469,6 +469,62 @@ void do_inotify(const int& id, const string& watchDir, Queue<SlurmJobDirectory>*
     cout << "do_inotify end:" << id << " watch: " << watchDir.c_str() << endl;
 }
 
+struct options_t {
+    string srcSpoolHashPath;
+    string targDestPath;
+    options_t():
+        srcSpoolHashPath("/var/spool/slurm/hash."),
+        targDestPath("/var/slurm/jobscript_archive")
+    {
+    }
+
+};
+
+options_t parse_options(int argc, char **argv)
+{
+    options_t options;
+    int c;
+    while ((c = getopt (argc, argv, ":d:i:o:")) != -1)
+    {
+        switch (c)
+        {
+            case 'd':
+                try {
+                    debug = stoul(optarg);
+                    if (debug > 3) {
+                        debug = 3;
+                    }
+                } catch (const invalid_argument &ia) {
+                    fprintf(stderr, "invalid argument to -%c parameter\n", c);
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            case 'i':
+                options.srcSpoolHashPath = optarg;
+                break;
+            case 'o':
+                options.targDestPath = optarg;
+                break;
+            case ':':
+                switch (optopt)
+                {
+                case 'd':
+                    debug = 1;
+                    break;
+                default:
+                    fprintf(stderr, "option -%c is missing a required argument\n", optopt);
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            case '?':
+                fprintf(stderr, "invalid option: -%c\n", optopt);
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    return options;
+}
+
 int main( int argc, char **argv ) {
 
     signal(SIGINT, sig);
@@ -483,35 +539,26 @@ int main( int argc, char **argv ) {
     sprintf(prtBuf, "main begin - for help: sudo kill -1 %ld", static_cast<long>(getpid()));
     logger.LOG(prtBuf);
 
-    if (argc == 2 && (strcmp(argv[1],"-d") == 0 || strcmp(argv[1],"-d1") == 0)) {
-        debug = 1;
-        std::cerr << "**** debug = " << debug << " ****" << std::endl;
-    }
-    if (argc == 2 && strcmp(argv[1],"-d2") == 0) {
-        debug = 2;
-        std::cerr << "**** debug = " << debug << " ****" << std::endl;
-    }
-    if (argc == 2 && strcmp(argv[1],"-d3") == 0) {
-        debug = 3;
+    options_t opts = parse_options(argc, argv);
+
+    if (debug > 0) {
         std::cerr << "**** debug = " << debug << " ****" << std::endl;
     }
 
-    string srcSpoolHashPath = "/var/spool/slurm/hash.";
-    string targDestPath = "/var/slurm/jobscript_archive";
     Queue<SlurmJobDirectory> queue;
 
     static const int QUE_THD_SIZE=2;
     thread th_que_process[QUE_THD_SIZE];
     // Create threads for watching queue - id: 10,11
     for (int i = 0; i < QUE_THD_SIZE; i++) {
-        th_que_process[i] = thread(do_processFiles, i+10, targDestPath, &queue, &logger);
+        th_que_process[i] = thread(do_processFiles, i+10, opts.targDestPath, &queue, &logger);
     }
 
     static const int DIR_THD_SIZE=10;
     thread th_inotify[DIR_THD_SIZE];
     // Create threads for watching hash directories - id: 0 to 9
     for (int i = 0; i < DIR_THD_SIZE; i++) {
-        string slurmHashDir = srcSpoolHashPath + to_string(static_cast<long long>(i));
+        string slurmHashDir = opts.srcSpoolHashPath + to_string(static_cast<long long>(i));
         th_inotify[i] = thread(do_inotify, i, slurmHashDir, &queue, &logger);
     }
 
