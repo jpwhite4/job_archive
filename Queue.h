@@ -2,8 +2,6 @@
 #ifndef _QUEUE_H
 #define _QUEUE_H
 
-#include <iostream>
-#include <unistd.h>
 #include <queue>
 #include <mutex>
 
@@ -21,15 +19,10 @@ public:
     ~Queue() {
         while (this->getQueueSize() > 0) {
             T * elem = this->dequeue();
-            if (!elem) break;
             delete elem;
         }
     }
     void enqueue(T * elem) {
-        //if (elem == nullptr) {
-        if (elem == 0) {
-            return;
-        }
         mutQue.lock();
         que.push(elem);
         mutQue.unlock();
@@ -37,7 +30,6 @@ public:
         semQue.post();
     }
     T * dequeue() {
-        //T * elem = nullptr;
         T * elem = 0;
 
         semQue.wait();

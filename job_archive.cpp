@@ -41,6 +41,7 @@ volatile sig_atomic_t debug = 0;
  * 2 - final do_processFiles status plus re-try warnings
  * 3 - verbose
  */
+volatile sig_atomic_t running(1);
 
 void sig(int signo) {
     // note - each version of linux implements different signals, this matches centos 6
@@ -67,6 +68,9 @@ void sig(int signo) {
     } else if (signo == SIGINT) {
         std::cerr << "**** INTERRUPT ****" << std::endl;
         abort();
+    } else if (signo == SIGTERM) {
+        // request to terminate program
+        running = 0;
     } else { // in case another signal call occurs, see sig list in main
         std::cerr << "**** SIGNAL: " << signo << " ****" << std::endl;
     }
@@ -217,9 +221,14 @@ void do_processFiles( const int& id, const string& targDestPath1, Queue<SlurmJob
 
     char prtBuf[100];
 
-    while( 1 ) {
+    while(running) {
         // process both (A)envrionment and (B)script files from: jobdir->srcjobdir
         SlurmJobDirectory* jobdir = pqueue->dequeue();
+
+        if (!jobdir) {
+            break;
+        }
+
         if (debug > 1) {
             sprintf( prtBuf, "do_processFiles:%d begin -%s", id, jobdir->getString().c_str());
             logger->LOG(prtBuf);
@@ -420,8 +429,32 @@ void do_inotify(const int& id, const string& watchDir, Queue<SlurmJobDirectory>*
         printf("watching:%d %s\n",id, watchDir.c_str());
     }
  
-    while( 1 ) {
+    while(running) {
         i = 0;
+
+         fd_set set;
+         struct timeval timeout;
+
+         /* Initialize the file descriptor set. */
+         FD_ZERO (&set);
+         FD_SET (fd, &set);
+
+         /* Initialize the timeout data structure. */
+         timeout.tv_sec = 0;
+         timeout.tv_usec = 100 * 1000;
+
+         int status = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
+
+         if (status == 0) {
+             // timeout - nothing to read yet
+             continue;
+         }
+         if (status < 0) {
+             perror("select");
+             exit(1);
+         }
+         // else data available
+
         length = read( fd, buffer, BUF_LEN );  
  
         if ( length < 0 ) {
@@ -527,12 +560,15 @@ options_t parse_options(int argc, char **argv)
 
 int main( int argc, char **argv ) {
 
-    signal(SIGINT, sig);
-    signal(SIGSEGV, sig);
-    signal(SIGABRT, sig);
-    signal(SIGHUP, sig);
-    signal(SIGUSR1, sig);
-    signal(SIGUSR2, sig);
+    struct sigaction sig_handler;
+    sig_handler.sa_handler = sig;
+    sigaction(SIGTERM, &sig_handler, 0);
+    sigaction(SIGINT, &sig_handler, 0);
+    sigaction(SIGSEGV, &sig_handler, 0);
+    sigaction(SIGABRT, &sig_handler, 0);
+    sigaction(SIGHUP, &sig_handler, 0);
+    sigaction(SIGUSR1, &sig_handler, 0);
+    sigaction(SIGUSR2, &sig_handler, 0);
 
     Logger logger;
     char prtBuf[100];
@@ -562,9 +598,17 @@ int main( int argc, char **argv ) {
         th_inotify[i] = thread(do_inotify, i, slurmHashDir, &queue, &logger);
     }
 
+    while(running) {
+        pause();
+    }
+
     // Join threads
     for (int i = 0; i < DIR_THD_SIZE; i++) {
         th_inotify[i].join();
+    }
+    // Unblock file threads.
+    for (int i = 0; i < QUE_THD_SIZE; i++) {
+        queue.enqueue(0);
     }
     // Join threads
     for (int i = 0; i < QUE_THD_SIZE; i++) {
