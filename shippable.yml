@@ -1,0 +1,12 @@
+language: none
+build:
+    pre_ci:
+        - docker build -t pseudo_repo/cibuild:latest .
+    pre_ci_boot:
+        image_name: pseudo_repo/openxdmod
+        image_tag: latest
+        pull: false
+        options: "--user root -e HOME=/root"
+    ci:
+        - ./test/bootstrap.sh
+        - ./test/integration_test.sh
