@@ -2,15 +2,15 @@
 
 INPUT_DIR=/tmp/spool/slurm/hash.
 OUTPUT_DIR=/tmp/output
+TESTDIR="$(cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd)"
+SRCDIR=$TESTDIR/..
 
-
+set -e
 
 function makejobfiles
 {
     JOBID=$1
     JOBDIR=${INPUT_DIR}0/job.$JOBID
-
-    echo $JOBDIR
 
     mkdir -p $JOBDIR
 
@@ -25,9 +25,8 @@ echo "Hello"
 EOF
 
 }
-echo "Starting job_archive"
 
-../job_archive -i $INPUT_DIR -o $OUTPUT_DIR -s > output.log 2>&1 &
+$SRCDIR/job_archive -i $INPUT_DIR -o $OUTPUT_DIR -s > output.log 2>&1 &
 jobpid=$!
 
 sleep 1
@@ -46,6 +45,20 @@ rm -rf $job1
 sleep 1
 makejobfiles 3000
 
-sleep 1000
+exitcode=1
+for ((i=0; i < 10; i++));
+do
+    filecount=$(find /tmp/output -name 3000.savescript | wc -l)
+    if [ $filecount = 1 ];
+    then
+        exitcode=0
+        break
+    fi
+    sleep 1
+done
+
 kill -TERM $jobpid
-wait
+wait $jobpid
+
+exit $exitcode
+
