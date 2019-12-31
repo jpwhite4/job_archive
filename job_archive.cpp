@@ -217,6 +217,52 @@ void saveJobFiles(char* reason, SlurmJobDirectory* jobdir, Logger* logger) {
     copyFile(jobdir->srcjobdir + "/script", destDir + "/script");
 } 
 
+/**
+ * File copy thread implementation. This simply copies the files from the source
+ * to target directory.
+ */
+void simpleFileCopy(const int &id, const string &targetPath, Queue<SlurmJobDirectory>* pqueue, Logger* logger) {
+
+    logger->LOG("simple file copy thread " + to_string(id) + " running");
+
+    while (running) {
+        SlurmJobDirectory* jobdir = pqueue->dequeue();
+
+        if (!jobdir) {
+            break;
+        }
+
+        string srcEnvFile = jobdir->srcjobdir + "/environment";
+        string srcScriptFile = jobdir->srcjobdir + "/script";
+
+        if (! doesFileExist(srcEnvFile) || ! doesFileExist(srcScriptFile)) {
+            jobdir->retryCnt++;
+            if (jobdir->elapsed() < 60) {
+                usleep(100);
+                pqueue->enqueue(jobdir);
+            } else {
+                delete jobdir;
+            }
+            continue;
+        }
+
+        string targetDir = targetPath + '/' + getDate();
+        if (!doesDirExist(targetDir)) {
+            const int dir_err = mkdir(targetDir.c_str(), S_IRWXU | S_IRGRP | S_IXGRP);
+            if (dir_err == -1) {
+                if (errno != EEXIST) {
+                    perror("mkdir");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
+
+        usleep(1000 * 1000);
+        copyFile(srcEnvFile, targetDir + "/" + to_string(jobdir->jobId) + ".environment");
+        copyFile(srcScriptFile, targetDir + "/" + to_string(jobdir->jobId) + ".savescript");
+    }
+}
+
 void do_processFiles( const int& id, const string& targDestPath1, Queue<SlurmJobDirectory>* pqueue, Logger* logger) {
 
     char prtBuf[100];
@@ -505,9 +551,12 @@ void do_inotify(const int& id, const string& watchDir, Queue<SlurmJobDirectory>*
 struct options_t {
     string srcSpoolHashPath;
     string targDestPath;
+    enum OperationMode { ENV_PARSE, SIMPLE_COPY };
+    OperationMode mode;
     options_t():
         srcSpoolHashPath("/var/spool/slurm/hash."),
-        targDestPath("/var/slurm/jobscript_archive")
+        targDestPath("/var/slurm/jobscript_archive"),
+        mode(ENV_PARSE)
     {
     }
 
@@ -517,7 +566,7 @@ options_t parse_options(int argc, char **argv)
 {
     options_t options;
     int c;
-    while ((c = getopt (argc, argv, ":d:i:o:")) != -1)
+    while ((c = getopt (argc, argv, ":d:i:o:s")) != -1)
     {
         switch (c)
         {
@@ -531,6 +580,9 @@ options_t parse_options(int argc, char **argv)
                     fprintf(stderr, "invalid argument to -%c parameter\n", c);
                     exit(EXIT_FAILURE);
                 }
+                break;
+            case 's':
+                options.mode = options_t::OperationMode::SIMPLE_COPY;
                 break;
             case 'i':
                 options.srcSpoolHashPath = optarg;
@@ -581,16 +633,22 @@ int main( int argc, char **argv ) {
         std::cerr << "**** debug = " << debug << " ****" << std::endl;
     }
 
+    void (*copyFunction)(const int&, const string&, Queue<SlurmJobDirectory>*, Logger*) = do_processFiles;
+    if (opts.mode == options_t::OperationMode::SIMPLE_COPY) {
+        copyFunction = simpleFileCopy;
+    }
+
     Queue<SlurmJobDirectory> queue;
 
     static const int QUE_THD_SIZE=2;
+    static const int DIR_THD_SIZE=10;
+
     thread th_que_process[QUE_THD_SIZE];
     // Create threads for watching queue - id: 10,11
     for (int i = 0; i < QUE_THD_SIZE; i++) {
-        th_que_process[i] = thread(do_processFiles, i+10, opts.targDestPath, &queue, &logger);
+        th_que_process[i] = thread(copyFunction, i+DIR_THD_SIZE, opts.targDestPath, &queue, &logger);
     }
 
-    static const int DIR_THD_SIZE=10;
     thread th_inotify[DIR_THD_SIZE];
     // Create threads for watching hash directories - id: 0 to 9
     for (int i = 0; i < DIR_THD_SIZE; i++) {

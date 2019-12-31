@@ -53,6 +53,27 @@ string getCurDateTimeMilliSec() {
   sprintf(result, "%s.%06d", buffer, microsec);
   return string(result);
 }
+
+std::string getDate() {
+    char buffer[9];
+    time_t t;
+    struct tm *tmp;
+
+    t = time(NULL);
+    tmp = localtime(&t);
+    if (tmp == NULL) {
+        perror("localtime");
+        exit(EXIT_FAILURE);
+    }
+
+    if (strftime(buffer, sizeof(buffer), "%Y%m%d", tmp) == 0) {
+        fprintf(stderr, "strftime returned 0");
+        exit(EXIT_FAILURE);
+    }
+
+    return std::string(buffer);
+}
+
 // example usage: from my timeElapse.cpp
 //   cout << getCurDateTime1() << " begin" << endl;
 //   struct timeval before = getCurTime();
@@ -124,6 +145,11 @@ void mkDirectory(const string dirName) {
 void copyFile( const string& srce_file, const string& dest_file ) {
     // normal copy such as 
     std::ifstream srce( srce_file, std::ios::binary ) ;
+    if (!srce.is_open()) {
+        // Source file could not be opened - give up here
+        std::cerr << "Error opening " << srce_file << std::endl;
+        return;
+    }
     std::ofstream dest( dest_file, std::ios::binary ) ;
     dest << srce.rdbuf() ;
     srce.close();
