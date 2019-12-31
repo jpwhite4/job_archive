@@ -7,7 +7,7 @@ Requires=local-fs.target
 Type=simple
 EnvironmentFile=-/etc/sysconfig/jobarchive.conf
 ExecStart=/usr/sbin/job_archive $JOB_ARCHIVE_ARGS
-User=root
+User=slurm
 
 [Install]
 WantedBy=multi-user.target
