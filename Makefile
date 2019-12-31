@@ -1,4 +1,4 @@
-VERSION ?= 1.0.0
+VERSION ?= 0.9.0
 SOURCES = job_archive.cpp
 
 CXXFLAGS = -W -Wall -Werror -pedantic -std=c++0x -ggdb
