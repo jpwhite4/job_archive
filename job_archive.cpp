@@ -232,10 +232,9 @@ void simpleFileCopy(const int &id, const string &targetPath, Queue<SlurmJobDirec
             break;
         }
 
-        string srcEnvFile = jobdir->srcjobdir + "/environment";
         string srcScriptFile = jobdir->srcjobdir + "/script";
 
-        if (! doesFileExist(srcEnvFile) || ! doesFileExist(srcScriptFile)) {
+        if (! doesFileExist(srcScriptFile)) {
             jobdir->retryCnt++;
             if (jobdir->elapsed() < 60) {
                 usleep(100);
@@ -257,9 +256,8 @@ void simpleFileCopy(const int &id, const string &targetPath, Queue<SlurmJobDirec
             }
         }
 
-        usleep(1000 * 1000);
-        copyFile(srcEnvFile, targetDir + "/" + to_string(jobdir->jobId) + ".environment");
         copyFile(srcScriptFile, targetDir + "/" + to_string(jobdir->jobId) + ".savescript");
+        delete jobdir;
     }
 }
 

@@ -1,5 +1,5 @@
 Name: job_archive
-Version: 0.9.0
+Version: 0.9.1
 Release: 1%{?dist}
 Summary: Tool to archive jobs scripts from the Slrum resource manager.
 
